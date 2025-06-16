@@ -1,51 +1,50 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { DocumentBuilder, OpenAPIObject, SwaggerModule } from '@nestjs/swagger';
 import { INestApplication } from '@nestjs/common/interfaces';
-import { HttpAdapterHost, ModulesContainer } from '@nestjs/core';
-import { appConfigInstance } from '../app-config/app-config.infrastructure';
+import { AppConfig } from '../app-config/app-config.infrastructure';
+
 
 @Injectable()
-export class SwaggerInfrastucture {
-  private readonly swaggerUrl: string = '/swagger';
-  private readonly swaggerFileName: string = 'swagger.json';
-  private readonly swaggerTitle: string = appConfigInstance.SWAGGER_TITLE;
-  private readonly swaggerDescription: string = appConfigInstance.SWAGGER_DESCRIPTION;
+export class SwaggerInfrastructure {
+  private readonly logger = new Logger(SwaggerInfrastructure.name);
+  private readonly swaggerUrl = '/swagger';
+  private readonly swaggerFileName = 'swagger.json';
+
+  constructor(private readonly appConfig: AppConfig) {}
 
   // Ініціалізація Swagger для додатку
-  public initialize(app: INestApplication) {
-    const httpAdapterHost: HttpAdapterHost = app.get(HttpAdapterHost);
-    const httpAdapter = httpAdapterHost.httpAdapter;
+  public initialize(app: INestApplication): void {
+    try {
+      const swaggerDoc = this.getSwaggerSpecDocument(app);
 
-    const swaggerDoc: OpenAPIObject = this.getSwaggerSpecDocument(app);
-    const swaggerUrl = `/${this.swaggerFileName}`;
+      SwaggerModule.setup(this.swaggerUrl, app, swaggerDoc, {
+        explorer: true,
+        swaggerOptions: {
+          persistAuthorization: true,
+          urls: [{ url: `/${this.swaggerFileName}`, name: 'API' }],
+        },
+      });
 
-    httpAdapter.get(swaggerUrl, (req, res) => {
-      res.json(swaggerDoc);
-    });
-
-    SwaggerModule.setup(this.swaggerUrl, app, undefined, {
-      explorer: true,
-      swaggerOptions: {
-        urls: [{ url: swaggerUrl, name: 'api' }],
-      },
-    });
+      this.logger.log(`Swagger UI initialized at ${this.swaggerUrl}`);
+      this.logger.log(`Swagger JSON available at /${this.swaggerFileName}`);
+    } catch (error) {
+      this.logger.error(`Failed to initialize Swagger: ${error.message}`);
+      throw error;
+    }
   }
 
-  // Генерація Swagger-документа з використанням зареєстрованих модулів
+  // Генерація Swagger-документа
   private getSwaggerSpecDocument(app: INestApplication): OpenAPIObject {
-    const modulesContainer = app.get(ModulesContainer);
-    const modules = Array.from(modulesContainer.values()).map(module => module.metatype);
-    const options = new DocumentBuilder()
-      .setTitle(this.swaggerTitle)
-      .setDescription(this.swaggerDescription)
-      .addBearerAuth()
-      .build();
-    return SwaggerModule.createDocument(app, options, { include: modules });
-  }
-}
+    const title = this.appConfig.SWAGGER_TITLE || 'Banners API';
+    const description = this.appConfig.SWAGGER_DESCRIPTION || 'API for managing banners';
 
-class SwaggerDocInfo {
-  public doc: OpenAPIObject;
-  public name: string;
-  public url: string;
+    const options = new DocumentBuilder()
+      .setTitle(title)
+      .setDescription(description)
+      .setVersion('1.0')
+      .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' })
+      .build();
+
+    return SwaggerModule.createDocument(app, options);
+  }
 }

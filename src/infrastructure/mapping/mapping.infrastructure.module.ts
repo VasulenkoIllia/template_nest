@@ -1,87 +1,75 @@
 import { DynamicModule, Logger, Module, Provider } from '@nestjs/common';
-import path from 'path';
-import fs from 'fs';
 import { AutomapperModule, AutomapperProfile } from '@automapper/nestjs';
 import { classes } from '@automapper/classes';
+import * as path from 'path';
+import * as fs from 'fs/promises';
 
 @Module({
   imports: [AutomapperModule.forRoot({ strategyInitializer: classes() })],
 })
 export class MappingInfrastructureModule {
   private static readonly logger = new Logger(MappingInfrastructureModule.name);
-
   private static readonly pathsToModelsFolder: string[] = [
     path.join(__dirname, '../../common/dto'),
   ];
 
-  static registerProfilesAsync(): DynamicModule {
+  static async registerProfilesAsync(): Promise<DynamicModule> {
     try {
-      const filesPaths: string[] = this.getAllFilesFromFolders(
-        this.pathsToModelsFolder,
-      );
-
+      const filesPaths = await this.getAllFilesFromFolders(this.pathsToModelsFolder);
       const automapperProfiles: Provider[] = [];
-
-      filesPaths
-        .filter((pathToFile: string) => {
-          return (
-            ['.js', '.ts'].includes(path.extname(pathToFile)) &&
-            path.basename(pathToFile) != 'index'
-          );
-        })
-        .forEach(async (pathToFile: string) => {
+      for (const pathToFile of filesPaths) {
+        if (!['.js', '.ts'].includes(path.extname(pathToFile)) || path.basename(pathToFile) === 'index') {
+          continue;
+        }
+        try {
           const file = await import(pathToFile);
-          Object.entries(file).forEach((item) => {
-            const profile = item[1];
-            if (
-              profile &&
-              typeof profile == 'function' &&
-              profile.prototype instanceof AutomapperProfile
-            ) {
+          for (const [, profile] of Object.entries(file)) {
+            if (typeof profile === 'function' && profile.prototype instanceof AutomapperProfile) {
               automapperProfiles.push(profile as Provider);
+              this.logger.debug(`Registered AutoMapper profile from ${pathToFile}`);
             }
-          });
-        });
-
+          }
+        } catch (error) {
+          this.logger.warn(`Failed to import profile from ${pathToFile}: ${error.message}`);
+        }
+      }
+      if (automapperProfiles.length === 0) {
+        this.logger.warn('No AutoMapper profiles found in specified folders.');
+      }
       return {
         global: true,
         module: MappingInfrastructureModule,
         providers: automapperProfiles,
         exports: automapperProfiles,
-      } as DynamicModule;
+      };
     } catch (error) {
-      this.logger.error(`Unable to init mappings: ${error.message}`);
-      process.exit(1);
+      this.logger.error(`Unable to initialize mappings: ${error.message}`);
+      throw new Error(`Failed to register AutoMapper profiles: ${error.message}`);
     }
   }
 
-  private static getAllFilesFromFolders(dirPaths: string[]) {
+  private static async getAllFilesFromFolders(dirPaths: string[]): Promise<string[]> {
     const resultFiles: string[] = [];
-    dirPaths.forEach((dirPath) => {
-      resultFiles.push(...this.getAllFilesFromFolder(dirPath));
-    });
+    for (const dirPath of dirPaths) {
+      resultFiles.push(...(await this.getAllFilesFromFolder(dirPath)));
+    }
     return resultFiles;
   }
 
-  private static getAllFilesFromFolder(
-    dirPath: string,
-    arrayOfFiles: string[] = [],
-  ) {
-    const files = fs.readdirSync(dirPath);
-
-    arrayOfFiles = arrayOfFiles || [];
-
-    files.forEach((file) => {
-      if (fs.statSync(dirPath + '/' + file).isDirectory()) {
-        arrayOfFiles = this.getAllFilesFromFolder(
-          dirPath + '/' + file,
-          arrayOfFiles,
-        );
-      } else {
-        arrayOfFiles.push(path.join(dirPath, '/', file));
+  private static async getAllFilesFromFolder(dirPath: string, arrayOfFiles: string[] = []): Promise<string[]> {
+    try {
+      const files = await fs.readdir(dirPath, { withFileTypes: true });
+      for (const file of files) {
+        const fullPath = path.join(dirPath, file.name);
+        if (file.isDirectory()) {
+          await this.getAllFilesFromFolder(fullPath, arrayOfFiles);
+        } else {
+          arrayOfFiles.push(fullPath);
+        }
       }
-    });
-
+    } catch (error) {
+      this.logger.warn(`Failed to read directory ${dirPath}: ${error.message}`);
+    }
     return arrayOfFiles;
   }
 }

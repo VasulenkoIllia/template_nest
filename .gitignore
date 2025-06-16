@@ -1,51 +1,64 @@
-# Node.js
+# Залежності
 node_modules/
+jspm_packages/
+
+# Логи
+logs/
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+lerna-debug.log*
 
-# Logs
-logs/
-*.log
+# Середовище виконання
+#.env
+#.env.test
+#.env.local
+#.env.development.local
+#.env.test.local
+#.env.production.local
 
-# Dependency directories
-jspm_packages/
-
-# Build directories
+# Збірки та кеш
 dist/
 build/
 coverage/
 .tmp/
+.cache/
+.nyc_output/
+.eslintcache
+.webpack/
+.serverless/
 
-# IDE directories
+# NestJS специфічні
+.nest/
+/src/generated/prisma
+
+# IDE та редактори
 .idea/
 .vscode/
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
+*.sw?
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
 
-# Operating system files
+# Операційні системи
 .DS_Store
 Thumbs.db
-
-# Package manager files
-package-lock.json
-yarn.lock
-
-
-# Python
-__pycache__/
-*.py[cod]
-*.egg-info/
-.Python
-env/
-venv/
-pip-log.txt
-
-# macOS
-*.DS_Store
-
-# Windows
-Thumbs.db
 ehthumbs.db
+Icon?
+Desktop.ini
+$RECYCLE.BIN/
+
+# Тимчасові файли
+*.tmp
+*.bak
+*.swp
+*~.nib
+local.properties

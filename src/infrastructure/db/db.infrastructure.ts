@@ -1,8 +1,8 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
 import { RoleService } from './role.service';
-import { UserService } from './user.service';
 import { ConfigService } from '@nestjs/config';
+import { UserService } from '../../components/user/user.service';
 
 // Клас відповідає за ініціалізацію бази даних та основних компонентів при старті додатку
 @Injectable()
@@ -14,8 +14,7 @@ export class DbInfrastructure implements OnModuleInit {
     private readonly roleService: RoleService,
     private readonly userService: UserService,
     private readonly configService: ConfigService,
-  ) {
-  }
+  ) {}
 
   // Метод викликається автоматично NestJS при ініціалізації модуля
   async onModuleInit() {
@@ -36,8 +35,8 @@ export class DbInfrastructure implements OnModuleInit {
 
     while (retries > 0) {
       try {
-        await this.prisma.$connect();
-        this.logger.log('Database connection has been established successfully.');
+        await this.prisma.client.$connect();
+        this.logger.log('Database connection established successfully.');
         return;
       } catch (error) {
         retries--;
